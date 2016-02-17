@@ -3,11 +3,13 @@ using System.Collections.Generic;
 using System.Configuration;
 using System.Security.AccessControl;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Timers;
 using InfluxDB.Net.Enums;
 using InfluxDB.Net.Infrastructure.Influx;
 using InfluxDB.Net.Models;
 using Tharga.Influx_Capacitor.Agents;
+using Tharga.Influx_Capacitor.Entities;
 using Tharga.Influx_Capacitor.Interface;
 using Timer = System.Timers.Timer;
 
@@ -38,6 +40,29 @@ namespace Tharga.Influx_Capacitor
                 Console.WriteLine("Unable to establish InfluxDB connection. Error: " + exception.Message);
                 _enabled = false;
             }
+        }
+
+        public async Task<QueueStatus> GetStatusAsync()
+        {
+            //Ping InfluxDB
+            PingStatus pingStatus;
+            try
+            {
+                var pong = await _agent.PingAsync();
+                pingStatus = new PingStatus(pong.Success, pong.ResponseTime, pong.Version);
+            }
+            catch (Exception exception)
+            {
+                pingStatus = new PingStatus(exception);
+            }
+
+            //Return setting parameters
+            var connecion = new ConnectionSettings(Enabled, Address, DatabaseName, UserName);
+
+            //Return objects in queue
+            var queueCount = _queue.Count;
+
+            return new QueueStatus(pingStatus, connecion, queueCount);
         }
 
         private static string Address
