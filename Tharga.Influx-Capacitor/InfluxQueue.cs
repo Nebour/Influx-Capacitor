@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Configuration;
 using System.Security.AccessControl;
 using System.Threading;
@@ -32,8 +33,9 @@ namespace Tharga.Influx_Capacitor
                     _agent = new InfluxDbAgent(Address, DatabaseName, UserName, Password, influxVersion);
                 }
             }
-            catch
+            catch(Exception exception)
             {
+                Console.WriteLine("Unable to establish InfluxDB connection. Error: " + exception.Message);
                 _enabled = false;
             }
         }
@@ -93,7 +95,8 @@ namespace Tharga.Influx_Capacitor
                     _enabled = enabled;
                 }
 
-                return _enabled ?? true;
+                var value = _enabled ?? true;
+                return value;
             }
         }
 
@@ -124,7 +127,10 @@ namespace Tharga.Influx_Capacitor
         public static void Enqueue(Point point)
         {
             if (!Enabled)
+            {
+                Console.WriteLine("Queue is disable. Dropping point.");
                 return;
+            }
 
             bool createdNew;
             using (var mutex = new Mutex(false, MutexId, out createdNew, _securitySettings))
