@@ -15,17 +15,23 @@ using Timer = System.Timers.Timer;
 
 namespace Tharga.Influx_Capacitor
 {
-    public class InfluxQueue
+    public interface IInfluxQueue
     {
-        private static readonly IInfluxDbAgent _agent;
-        private static readonly Queue<Point[]> _queue = new Queue<Point[]>();
-        private static Timer _sendTimer;
+        void Enqueue(Point point);
+        Task<QueueStatus> GetStatusAsync();
+    }
 
+    public class InfluxQueue : IInfluxQueue
+    {
+        private readonly IInfluxDbAgent _agent;
+        private readonly Queue<Point[]> _queue = new Queue<Point[]>();
+        private readonly string _initiationError;
         private const string MutexId = "InfluxQueue";
-        private static MutexSecurity _securitySettings;
-        private static bool? _enabled;
+        private MutexSecurity _securitySettings;
+        private Timer _sendTimer;
+        private bool? _enabled;
 
-        static InfluxQueue()
+        public InfluxQueue()
         {
             try
             {
@@ -37,7 +43,8 @@ namespace Tharga.Influx_Capacitor
             }
             catch(Exception exception)
             {
-                Console.WriteLine("Unable to establish InfluxDB connection. Error: " + exception.Message);
+                _initiationError = "Unable to establish InfluxDB connection. Error: " + exception.Message;
+                Console.WriteLine(_initiationError);
                 _enabled = false;
             }
         }
@@ -48,12 +55,19 @@ namespace Tharga.Influx_Capacitor
             PingStatus pingStatus;
             try
             {
-                var pong = await _agent.PingAsync();
-                pingStatus = new PingStatus(pong.Success, pong.ResponseTime, pong.Version);
+                if (_agent != null)
+                {
+                    var pong = await _agent.PingAsync();
+                    pingStatus = new PingStatus(pong.Success, pong.ResponseTime, pong.Version);
+                }
+                else
+                {
+                    pingStatus = new PingStatus(_initiationError);
+                }
             }
             catch (Exception exception)
             {
-                pingStatus = new PingStatus(exception);
+                pingStatus = new PingStatus(exception.Message);
             }
 
             //Return setting parameters
@@ -65,7 +79,8 @@ namespace Tharga.Influx_Capacitor
             return new QueueStatus(pingStatus, connecion, queueCount);
         }
 
-        private static string Address
+        //TODO: Move theese properties out of the class, they should be injected
+        private string Address
         {
             get
             {
@@ -75,7 +90,7 @@ namespace Tharga.Influx_Capacitor
             }
         }
 
-        private static string DatabaseName
+        private string DatabaseName
         {
             get
             {
@@ -85,7 +100,7 @@ namespace Tharga.Influx_Capacitor
             }
         }
 
-        private static string UserName
+        private string UserName
         {
             get
             {
@@ -95,7 +110,7 @@ namespace Tharga.Influx_Capacitor
             }
         }
 
-        private static string Password
+        private string Password
         {
             get
             {
@@ -105,7 +120,7 @@ namespace Tharga.Influx_Capacitor
             }
         }
 
-        private static bool Enabled
+        private bool Enabled
         {
             get
             {
@@ -125,7 +140,7 @@ namespace Tharga.Influx_Capacitor
             }
         }
 
-        private static async void SendTimerElapsed(object sender, ElapsedEventArgs e)
+        private async void SendTimerElapsed(object sender, ElapsedEventArgs e)
         {
             var pts = new List<Point>();
             InfluxDbApiResponse result = null;
@@ -149,7 +164,7 @@ namespace Tharga.Influx_Capacitor
             result = await _agent.WriteAsync(pts.ToArray());
         }
 
-        public static void Enqueue(Point point)
+        public void Enqueue(Point point)
         {
             if (!Enabled)
             {

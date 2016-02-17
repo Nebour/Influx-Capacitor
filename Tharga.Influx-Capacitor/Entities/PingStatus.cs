@@ -4,14 +4,14 @@ namespace Tharga.Influx_Capacitor.Entities
 {
     public class PingStatus
     {
-        private readonly Exception _exception;
+        private readonly string _errorMessage;
         private readonly bool _success;
         private readonly TimeSpan _responseTime;
         private readonly string _version;
 
-        public PingStatus(Exception exception)
+        public PingStatus(string errorMessage)
         {
-            _exception = exception;
+            _errorMessage = errorMessage;
             _success = false;
         }
 
@@ -37,9 +37,9 @@ namespace Tharga.Influx_Capacitor.Entities
             get { return _version; }
         }
 
-        public Exception Exception
+        public string ErrorMessage
         {
-            get { return _exception; }
+            get { return _errorMessage; }
         }
     }
 }
